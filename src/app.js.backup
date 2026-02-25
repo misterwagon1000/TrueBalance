@@ -1,0 +1,319 @@
+import './style.css';
+import { parseCSV } from './parser.js';
+import { categorizeTransactions } from './categorizer.js';
+import { aggregateData, groupTransactionsByMonth } from './aggregator.js';
+import { renderReport, renderMonthlyReport, renderInsights, renderBudgets, renderSuggestedBudget } from './ui.js';
+import { saveTransactions, getBudgets, saveBudget, deleteBudget, getAllMonths, getTransactionsByMonth, saveInsights } from './database.js';
+import { generateInsights } from './insights.js';
+import { generateBudgetSuggestions } from './budgetSuggestions.js';
+
+let allTransactions = [];
+let categorizedData = null;
+let monthlyData = [];
+let currentMonth = null;
+let currentBudgets = [];
+
+const fileInput = document.getElementById('file-input');
+const uploadBtn = document.getElementById('upload-btn');
+const uploadSection = document.getElementById('upload-section');
+const reportSection = document.getElementById('report-section');
+const addBudgetBtn = document.getElementById('add-budget-btn');
+const budgetModal = document.getElementById('budget-modal');
+const budgetForm = document.getElementById('budget-form');
+const budgetMonthSelector = document.getElementById('budget-month-selector');
+
+uploadBtn.addEventListener('click', () => {
+    fileInput.click();
+});
+
+document.querySelector('.upload-box').addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('dragover');
+});
+
+document.querySelector('.upload-box').addEventListener('dragleave', (e) => {
+    e.currentTarget.classList.remove('dragover');
+});
+
+document.querySelector('.upload-box').addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFile(files[0]);
+    }
+});
+
+fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+    }
+});
+
+addBudgetBtn.addEventListener('click', () => {
+    openBudgetModal();
+});
+
+budgetForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await handleBudgetSubmit();
+});
+
+budgetMonthSelector.addEventListener('change', async (e) => {
+    const selectedMonth = e.target.value;
+    if (selectedMonth) {
+        currentMonth = selectedMonth;
+        await loadBudgetsForMonth(selectedMonth);
+    } else {
+        await displayReport();
+    }
+});
+
+async function handleFile(file) {
+    try {
+        const text = await file.text();
+        console.log('File loaded, parsing CSV...');
+
+        allTransactions = parseCSV(text);
+        console.log('Parsed transactions:', allTransactions.length);
+        console.log('Sample parsed transaction:', allTransactions[0]);
+
+        if (allTransactions.length === 0) {
+            alert('No valid transactions found in the CSV file. Please check the format.');
+            return;
+        }
+
+        categorizedData = categorizeTransactions(allTransactions);
+        console.log('Categorized transactions:', categorizedData.length);
+        console.log('Sample categorized item:', categorizedData[0]);
+
+        if (categorizedData.length === 0) {
+            alert('No valid categorized transactions. Please check the CSV format.');
+            return;
+        }
+
+        monthlyData = groupTransactionsByMonth(categorizedData);
+        console.log('Monthly data groups:', monthlyData.length);
+
+        if (monthlyData.length === 0) {
+            alert('No valid monthly data generated. Please check the CSV format.');
+            return;
+        }
+
+        const months = monthlyData.map(m => m.month);
+        currentMonth = months[months.length - 1];
+
+        await saveTransactions(allTransactions, categorizedData);
+
+        await displayReport();
+
+        uploadSection.style.display = 'none';
+        reportSection.style.display = 'block';
+
+    } catch (error) {
+        console.error('Error processing file:', error);
+        console.error('Error stack:', error.stack);
+        alert(`Error processing CSV file: ${error.message}\nPlease check the browser console for details.`);
+    }
+}
+
+
+async function displayReport() {
+    if (monthlyData.length > 0) {
+        renderMonthlyReport(monthlyData);
+
+        const allInsights = [];
+        for (const monthData of monthlyData) {
+            const budgets = await getBudgets(monthData.month);
+            const insights = generateInsights(monthData.transactions, budgets);
+            await saveInsights(insights, monthData.month);
+            allInsights.push(...insights);
+        }
+
+        renderInsights(allInsights);
+
+        populateMonthSelector();
+
+        const budgetSuggestions = generateBudgetSuggestions(monthlyData);
+        renderSuggestedBudget(budgetSuggestions);
+
+        currentBudgets = await getBudgets(currentMonth);
+        const currentMonthData = monthlyData.find(m => m.month === currentMonth);
+        if (currentMonthData) {
+            renderBudgets(currentBudgets, currentMonthData.summary.categoryTotals, currentMonth);
+        }
+    } else {
+        const summary = aggregateData(categorizedData);
+        currentBudgets = await getBudgets(currentMonth);
+        const insights = generateInsights(categorizedData, currentBudgets);
+        await saveInsights(insights, currentMonth);
+        renderReport(summary, categorizedData);
+        renderInsights(insights);
+        renderBudgets(currentBudgets, summary.categoryTotals, currentMonth);
+        renderSuggestedBudget(null);
+    }
+}
+
+function populateMonthSelector() {
+    if (monthlyData.length > 0) {
+        const months = monthlyData.map(m => m.month);
+        budgetMonthSelector.innerHTML = '<option value="">All Months</option>' +
+            months.map(month =>
+                `<option value="${month}" ${month === currentMonth ? 'selected' : ''}>${formatMonthDisplay(month)}</option>`
+            ).join('');
+    }
+}
+
+async function loadBudgetsForMonth(month) {
+    const budgets = await getBudgets(month);
+    const monthData = monthlyData.find(m => m.month === month);
+    if (monthData) {
+        renderBudgets(budgets, monthData.summary.categoryTotals, month);
+    }
+}
+
+
+function openBudgetModal() {
+    const categorySelect = document.getElementById('budget-category');
+
+    let categoryTotals = [];
+    if (monthlyData.length > 0) {
+        const currentMonthData = monthlyData.find(m => m.month === currentMonth);
+        if (currentMonthData) {
+            categoryTotals = currentMonthData.summary.categoryTotals;
+        }
+    } else {
+        const summary = aggregateData(categorizedData);
+        categoryTotals = summary.categoryTotals;
+    }
+
+    categorySelect.innerHTML = '<option value="">Select a category</option>' +
+        categoryTotals
+            .filter(([cat]) => cat !== 'Income' && cat !== 'Transfers')
+            .map(([category]) =>
+                `<option value="${category}">${category}</option>`
+            ).join('');
+
+    budgetModal.style.display = 'flex';
+}
+
+window.closeBudgetModal = function() {
+    budgetModal.style.display = 'none';
+    budgetForm.reset();
+};
+
+async function handleBudgetSubmit() {
+    const category = document.getElementById('budget-category').value;
+    const amount = parseFloat(document.getElementById('budget-amount').value);
+
+    if (!category || !amount) return;
+
+    try {
+        await saveBudget(category, amount, currentMonth);
+        await displayReport();
+        window.closeBudgetModal();
+    } catch (error) {
+        console.error('Error saving budget:', error);
+        alert('Error saving budget. Please try again.');
+    }
+}
+
+window.deleteBudgetItem = async function(category) {
+    if (!confirm(`Delete budget for ${category}?`)) return;
+
+    try {
+        await deleteBudget(category, currentMonth);
+        await displayReport();
+    } catch (error) {
+        console.error('Error deleting budget:', error);
+        alert('Error deleting budget. Please try again.');
+    }
+};
+
+const searchInput = document.getElementById('search-input');
+const categoryFilter = document.getElementById('category-filter');
+
+if (searchInput) {
+    searchInput.addEventListener('input', filterTransactions);
+}
+
+if (categoryFilter) {
+    categoryFilter.addEventListener('change', filterTransactions);
+}
+
+function filterTransactions() {
+    if (!categorizedData) return;
+
+    const searchTerm = searchInput.value.toLowerCase();
+    const selectedCategory = categoryFilter.value;
+
+    const filtered = categorizedData.filter(item => {
+        const matchesSearch = item.transaction.description.toLowerCase().includes(searchTerm) ||
+                            item.transaction.date.includes(searchTerm);
+        const matchesCategory = !selectedCategory || item.category === selectedCategory;
+
+        return matchesSearch && matchesCategory;
+    });
+
+    renderTransactionTable(filtered);
+}
+
+function renderTransactionTable(data) {
+    const tbody = document.getElementById('transactions-body');
+    tbody.innerHTML = data.map(item => {
+        const isExpense = item.transaction.amount < 0;
+        const amountClass = isExpense ? 'negative' : 'positive';
+        const sign = isExpense ? '-' : '+';
+        const amount = Math.abs(item.transaction.amount);
+
+        return `
+            <tr>
+                <td>${item.transaction.date}</td>
+                <td class="description">${item.transaction.description}</td>
+                <td><span class="category-badge ${getCategoryClass(item.category)}">${item.category}</span></td>
+                <td class="text-right ${amountClass}">${sign}$${amount.toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function getCategoryClass(category) {
+    const classMap = {
+        'Income': 'cat-income',
+        'Rent': 'cat-rent',
+        'Food': 'cat-food',
+        'Utilities': 'cat-utilities',
+        'Auto & Gas': 'cat-auto',
+        'Subscriptions': 'cat-subscriptions',
+        'Transfers': 'cat-transfers',
+        'Shopping': 'cat-shopping',
+        'Entertainment': 'cat-entertainment',
+        'Charity': 'cat-charity',
+        'Uncategorized': 'cat-uncategorized'
+    };
+    return classMap[category] || 'cat-default';
+}
+
+function extractMonthFromTransactions(transactions) {
+    if (transactions.length === 0) return null;
+
+    const [month, day, year] = transactions[0].date.split('/');
+    return `${year}-${month.padStart(2, '0')}`;
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+}
+
+function formatMonthDisplay(monthString) {
+    const [year, month] = monthString.split('-');
+    const date = new Date(year, parseInt(month) - 1);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+}
+
+window.filterTransactions = filterTransactions;
+window.renderTransactionTable = renderTransactionTable;

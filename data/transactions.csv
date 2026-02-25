@@ -1,0 +1,21 @@
+Account,Transaction Date,Posted Date,No.,Description,Debit,Credit,Long Description
+Checking,01/15/2024,01/15/2024,001,TRAILS APARTMENT RENT,1200.00,,Monthly rent payment
+Checking,01/16/2024,01/16/2024,002,KROGER #342,87.45,,Grocery shopping
+Checking,01/17/2024,01/17/2024,003,ELECTRIC COMPANY,125.30,,Monthly electric bill
+Checking,01/18/2024,01/18/2024,004,EB FROM CHECKING,,2500.00,Payroll deposit
+Checking,01/19/2024,01/19/2024,005,NETFLIX.COM,15.99,,Streaming subscription
+Checking,01/20/2024,01/20/2024,006,CHICK-FIL-A #1234,12.50,,Restaurant meal
+Checking,01/22/2024,01/22/2024,007,INTERNET SERVICE,79.99,,Monthly internet bill
+Checking,01/23/2024,01/23/2024,008,WALMART SUPERCENTER,145.67,,Shopping
+Checking,01/24/2024,01/24/2024,009,VENMO TRANSFER,50.00,,Payment to friend
+Checking,01/25/2024,01/25/2024,010,SPOTIFY PREMIUM,10.99,,Music subscription
+Checking,01/26/2024,01/26/2024,011,MCDONALD'S,8.75,,Fast food
+Checking,01/28/2024,01/28/2024,012,WATER UTILITY,45.00,,Monthly water bill
+Checking,01/29/2024,01/29/2024,013,OPENAI API,20.00,,AI service subscription
+Checking,01/30/2024,01/30/2024,014,RANDOM STORE XYZ,234.56,,Shopping - unclear category
+Checking,02/01/2024,02/01/2024,015,PAYROLL DEPOSIT,,2500.00,Salary payment
+Checking,02/02/2024,02/02/2024,016,TRAILS PROPERTY MGMT,1200.00,,Rent payment
+Checking,02/05/2024,02/05/2024,017,KROGER #342,93.21,,Groceries
+Checking,02/07/2024,02/07/2024,018,ZELLE PAYMENT,100.00,,Transfer out
+Checking,02/08/2024,02/08/2024,019,COFFEE SHOP DOWNTOWN,5.50,,Coffee purchase
+Checking,02/10/2024,02/10/2024,020,ELECTRIC COMPANY,132.45,,Electric bill
