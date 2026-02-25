@@ -1,0 +1,24 @@
+{
+  "name": "truebalance",
+  "version": "1.0.0",
+  "description": "TrueBalance - Personal finance management and transaction categorization",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "finance",
+    "banking",
+    "transactions",
+    "categorization",
+    "budgeting"
+  ],
+  "author": "Patrick",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.97.0",
+    "git": "^0.1.5",
+    "vite": "^7.3.1"
+  }
+}
